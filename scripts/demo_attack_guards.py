@@ -123,22 +123,37 @@ async def main() -> None:
             pass_live.append((name, prompt))
         print()
 
-    from core.config import PROVIDER_GEMINI, get_openai_api_key, get_llm_provider
+    from core.config import (
+        PROVIDER_GEMINI,
+        get_llm_provider,
+        get_openai_api_key,
+        get_red_gateway,
+        get_red_model,
+    )
 
     provider = get_llm_provider()
-    key_ok = (
-        os.environ.get("GOOGLE_API_KEY", "").strip()
-        if provider == PROVIDER_GEMINI
-        else get_openai_api_key()
-    )
+    gateway = get_red_gateway()
+    if gateway == "beeknoee":
+        key_name = "BEEKNOEE_API_KEY"
+        key_ok = os.environ.get(key_name, "").strip()
+    elif provider == PROVIDER_GEMINI:
+        key_name = "GOOGLE_API_KEY"
+        key_ok = os.environ.get(key_name, "").strip()
+    else:
+        key_name = "OPENAI_API_KEY"
+        key_ok = get_openai_api_key()
+
     if not key_ok:
         print(
-            f"No API key for provider={provider} — stopped before live LLM calls.\n"
-            "Set OPENAI_API_KEY or GOOGLE_API_KEY in .env then re-run:\n"
+            f"No {key_name} for provider={provider}, gateway={gateway} "
+            "— stopped before live LLM calls.\n"
+            f"Set {key_name} in .env then re-run:\n"
             "  python scripts/demo_attack_guards.py"
         )
         print(f"Prompts that would reach the model: {len(pass_live)}")
         return
+
+    print(f"Live model: {provider}:{get_red_model()} via {gateway}")
 
     # Classic blocked + prompts that pass input filter
     sample = ATTACKS[:3] + pass_live

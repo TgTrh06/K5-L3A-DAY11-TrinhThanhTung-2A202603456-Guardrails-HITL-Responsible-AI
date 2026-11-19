@@ -35,8 +35,10 @@ from typing import Any, Optional
 
 from agents.security_boundary import contains_secret, normalize_for_security
 from core.config import (
+    BEEKNOEE_BASE_URL,
     DEMO_SECRETS,
     PROVIDER_GEMINI,
+    get_red_gateway,
     get_red_model,
     get_red_provider,
 )
@@ -229,6 +231,14 @@ def require_nemo():
 
 
 def _model_entry(provider: str, model: str) -> dict:
+    if get_red_gateway() == "beeknoee":
+        return {
+            "type": "main",
+            "engine": "openai",
+            "model": model,
+            "api_key_env_var": "BEEKNOEE_API_KEY",
+            "parameters": {"base_url": BEEKNOEE_BASE_URL},
+        }
     if provider == PROVIDER_GEMINI:
         return {
             "type": "main",

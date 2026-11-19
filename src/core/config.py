@@ -43,6 +43,7 @@ DEFAULT_OPENROUTER_MODEL = BLUE_MODEL  # alias
 # --- Red Team ---
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+BEEKNOEE_BASE_URL = "https://platform.beeknoee.com/v1"
 # Model khó — tuỳ chọn (không phải tên agent; không bắt buộc để có B1/B2)
 HARD_OPENAI_MODEL = "gpt-5.6-luna"
 HARD_GEMINI_MODEL = "gemini-3.8-flash"
@@ -169,22 +170,38 @@ def get_openai_api_key() -> str:
     return os.environ.get("OPENAI_API_KEY", "").strip()
 
 
+def get_red_gateway() -> str:
+    """Transport for Red Team requests; the underlying provider stays unchanged."""
+    gateway = os.environ.get("RED_TEAM_GATEWAY", "direct").strip().lower()
+    if gateway not in {"direct", "beeknoee"}:
+        raise ValueError("RED_TEAM_GATEWAY must be direct or beeknoee")
+    return gateway
+
+
 def red_openai_client_kwargs() -> dict:
+    if get_red_gateway() == "beeknoee":
+        return {
+            "api_key": os.environ.get("BEEKNOEE_API_KEY", "").strip() or None,
+            "base_url": BEEKNOEE_BASE_URL,
+        }
     return {"api_key": get_openai_api_key() or None}
 
 
 def red_provider_label(tier: str = "advance") -> str:
     # tier giữ để tương thích call site; cả hai agent cùng model .env
     _ = tier
-    return f"{get_red_provider()}:{get_red_model()}"
+    label = f"{get_red_provider()}:{get_red_model()}"
+    if get_red_gateway() == "beeknoee":
+        label += " via beeknoee"
+    return label
 
 
 def red_uses_openai_sdk() -> bool:
-    return get_red_provider() == PROVIDER_OPENAI
+    return get_red_gateway() == "beeknoee" or get_red_provider() == PROVIDER_OPENAI
 
 
 def red_uses_gemini() -> bool:
-    return get_red_provider() == PROVIDER_GEMINI
+    return get_red_gateway() == "direct" and get_red_provider() == PROVIDER_GEMINI
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +261,11 @@ def setup_api_key():
 
     red = get_red_provider()
     model = get_red_model()
-    if red == PROVIDER_GEMINI:
+    if get_red_gateway() == "beeknoee":
+        if not os.environ.get("BEEKNOEE_API_KEY", "").strip():
+            raise RuntimeError("Set BEEKNOEE_API_KEY in the local .env before CP4.")
+        print(f"Red / Red Advance  — {red}:{model} via beeknoee")
+    elif red == PROVIDER_GEMINI:
         if not os.environ.get("GOOGLE_API_KEY", "").strip():
             os.environ["GOOGLE_API_KEY"] = input("Enter Google API Key (Red): ").strip()
         os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "0"
